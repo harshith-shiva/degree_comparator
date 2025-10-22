@@ -10,6 +10,7 @@
 #include <SFML/Graphics.hpp>
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -292,6 +293,105 @@ void printGraphIntersection(
     }
 }
 
+struct ChainResult 
+{
+    int length;                
+    vector<string> path;      
+};
+
+ChainResult longestChainTopo(const unordered_map<string, vector<string>>& graph)
+{
+    unordered_map<string, int> indeg;
+    unordered_set<string> nodes;
+
+    // Step 1: Build indegree table and collect all nodes
+    for (auto& [u, nbrs] : graph) {
+        nodes.insert(u);
+        for (auto& v : nbrs) {
+            indeg[v]++;
+            nodes.insert(v);
+        }
+    }
+    for (auto& n : nodes)
+        if (!indeg.count(n)) indeg[n] = 0;
+
+    // Step 2: Kahn’s Topological Sort
+    queue<string> q;
+    for (auto& [n, d] : indeg)
+        if (d == 0) q.push(n);
+
+    vector<string> topo;
+    while (!q.empty()) {
+        string u = q.front(); q.pop();
+        topo.push_back(u);
+        if (graph.count(u)) {
+            for (auto& v : graph.at(u)) {
+                indeg[v]--;
+                if (indeg[v] == 0) q.push(v);
+            }
+        }
+    }
+
+    if (topo.size() != nodes.size())
+        throw runtime_error("Cycle detected in prerequisites!");
+
+    // Step 3: DP arrays
+    unordered_map<string, int> dp;
+    unordered_map<string, string> nextNode;
+
+    for (auto& n : nodes) {
+        dp[n] = 1;          // each node itself
+        nextNode[n] = "";   // no next
+    }
+
+    // Step 4: Process in reverse topological order
+    for (auto it = topo.rbegin(); it != topo.rend(); ++it) {
+        string u = *it;
+        if (graph.count(u)) {
+            for (auto& v : graph.at(u)) {
+                if (1 + dp[v] > dp[u]) {
+                    dp[u] = 1 + dp[v];
+                    nextNode[u] = v;
+                }
+            }
+        }
+    }
+
+    // Step 5: Find starting node of longest chain
+    string start;
+    int maxLen = 0;
+    for (auto& [n, val] : dp) {
+        if (val > maxLen) {
+            maxLen = val;
+            start = n;
+        }
+    }
+
+    // Step 6: Reconstruct path
+    vector<string> path;
+    string cur = start;
+    while (!cur.empty()) {
+        path.push_back(cur);
+        cur = nextNode[cur];
+    }
+
+    // Step 7: Print results here (inside function)
+    cout << "\n--- Longest Prerequisite Chain Details ---\n";
+    cout << "Length: " << maxLen << "\n";
+    cout << "Chain: ";
+    for (size_t i = 0; i < path.size(); ++i) {
+        cout << path[i];
+        if (i + 1 < path.size()) cout << " -> ";
+    }
+    cout << "\n------------------------------------------\n";
+
+    // Step 8: Return for completeness (optional)
+    ChainResult result;
+    result.length = maxLen;
+    result.path = path;
+    return result;
+}
+
 
 
 
@@ -329,10 +429,12 @@ int main() {
     
     
     buildGraphFromUser(graph1);
-    buildGraphFromUser(graph2);   
+    buildGraphFromUser(graph2); 
+     
     drawGraph(graph1); 
     cout<<endl;
-    //printgraph(graph2);     
+    //printgraph(graph2); 
+    drawGraph(graph2);     
     cout<<endl;      
     print_percentage_of_coredomains(graph1);
     cout<<endl;
@@ -341,6 +443,8 @@ int main() {
     cout<<endl;
     system("pause");
     printGraphIntersection(graph1,graph2);
-    
+    system("pause");
+    longestChainTopo(graph1);
+    system("pause");
     return 0;
 }

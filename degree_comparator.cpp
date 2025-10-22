@@ -1,11 +1,16 @@
 #include <iostream>
 #include<unordered_map>
+#include <unordered_set>
 #include<vector>
 #include<fstream>
 #include<sstream>
 #include <algorithm>
 #include <numeric> 
 #include <iomanip>
+#include <SFML/Graphics.hpp>
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 using namespace std;
 
 unordered_map<string,vector<string>> graph;
@@ -28,6 +33,113 @@ void printgraph(const unordered_map<string, vector<string>>& graph) {
         cout << endl;
     }
 }
+
+void drawArrow(sf::RenderWindow &window, sf::Vector2f start, sf::Vector2f end) {
+    sf::Vertex line[] = {
+        sf::Vertex(start, sf::Color::Black),
+        sf::Vertex(end, sf::Color::Black)
+    };
+    window.draw(line, 2, sf::Lines);
+
+    // Create a small triangle for the arrowhead
+    sf::Vector2f direction = end - start;
+    float length = sqrt(direction.x * direction.x + direction.y * direction.y);
+    direction /= length;
+
+    sf::Vector2f perpendicular(-direction.y, direction.x);
+    float arrowSize = 10.f;
+
+    sf::ConvexShape arrowHead;
+    arrowHead.setPointCount(3);
+    arrowHead.setPoint(0, end);
+    arrowHead.setPoint(1, end - direction * arrowSize + perpendicular * (arrowSize / 2));
+    arrowHead.setPoint(2, end - direction * arrowSize - perpendicular * (arrowSize / 2));
+    arrowHead.setFillColor(sf::Color::Black);
+
+    window.draw(arrowHead);
+}
+
+
+void drawGraph(const unordered_map<string, vector<string>>& graph) {
+    sf::RenderWindow window(sf::VideoMode(1000, 800), "Graph Visualization");
+
+    // Load a font
+    sf::Font font;
+    if (!font.loadFromFile("NotoSerif-Regular.ttf")) {
+    cerr << "Error: Could not load font!\n";
+    system("pause");
+    return;
+}
+
+
+    // Arrange nodes in a circle layout
+    int n = graph.size();
+    float centerX = 500, centerY = 400, radius = 250;
+    vector<sf::Vector2f> positions;
+    vector<string> nodes;
+
+    for (auto &p : graph)
+        nodes.push_back(p.first);
+
+    for (int i = 0; i < n; ++i) {
+        float angle = i * (2 * M_PI / n);
+        positions.push_back({centerX + radius * cos(angle), centerY + radius * sin(angle)});
+    }
+
+    // Main draw loop
+    while (window.isOpen()) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed)
+                window.close();
+        }
+
+        window.clear(sf::Color::White);
+
+        // Draw edges
+        for (int i = 0; i < n; ++i) {
+            const auto &from = nodes[i];
+            for (auto &to : graph.at(from)) {
+                auto it = find(nodes.begin(), nodes.end(), to);
+                if (it != nodes.end()) {
+                    int j = distance(nodes.begin(), it);
+                    drawArrow(window, positions[i], positions[j]);
+                }
+            }
+        }
+
+        // Draw nodes
+        for (int i = 0; i < n; ++i) {
+            sf::CircleShape node(30);
+            node.setFillColor(sf::Color(150, 200, 255));
+            node.setOutlineThickness(2);
+            node.setOutlineColor(sf::Color::Black);
+            node.setPosition(positions[i].x - 30, positions[i].y - 30);
+
+            sf::Text text;
+            text.setFont(font);
+            text.setString(nodes[i]);
+            text.setCharacterSize(14);
+            text.setFillColor(sf::Color::Black);
+
+            // Center text inside circle
+            sf::FloatRect textRect = text.getLocalBounds();
+            text.setOrigin(textRect.width / 2, textRect.height / 2);
+            text.setPosition(positions[i]);
+
+            window.draw(node);
+            window.draw(text);
+        }
+
+        window.display();
+    }
+}
+
+
+
+
+
+
 
 vector<string> findpostrequisites(const unordered_map<string, vector<string>>& graph, const string& s) {
     ifstream file("degree1.csv");
@@ -124,7 +236,7 @@ void buildGraphFromUser(unordered_map<string, vector<string>>& graph) {
         cout << "Enter the course: ";
         getline(cin, input);
 
-        // Add postrequisites using your existing logic
+        
         vector<string> post = findpostrequisites(graph, input);
         for (size_t i = 0; i < post.size(); ++i) {
             if (find1(graph, post[i])) {
@@ -132,7 +244,7 @@ void buildGraphFromUser(unordered_map<string, vector<string>>& graph) {
             }
         }
 
-        // Read CSV to connect prerequisites
+     
         string line;
         while (getline(file, line)) {
             vector<string> courses;
@@ -183,7 +295,29 @@ void printGraphIntersection(
 
 
 
+void printIndependentCourses(const unordered_map<string, vector<string>>& graph) {
+    
+    unordered_set<string> dependentCourses;
+    for (const auto& pair : graph) {
+        for (const auto& neighbor : pair.second) {
+            dependentCourses.insert(neighbor);
+        }
+    }
 
+   
+    cout << "Independent courses (no prerequisites):\n";
+    bool found = false;
+    for (const auto& pair : graph) {
+        if (dependentCourses.find(pair.first) == dependentCourses.end()) {
+            cout << pair.first << endl;
+            found = true;
+        }
+    }
+
+    if (!found) {
+        cout << "No independent courses found.\n";
+    }
+}
 
 
 
@@ -195,15 +329,17 @@ int main() {
     
     
     buildGraphFromUser(graph1);
-    buildGraphFromUser(graph2);   // now graph is populated
-    printgraph(graph1); 
+    buildGraphFromUser(graph2);   
+    drawGraph(graph1); 
     cout<<endl;
-    printgraph(graph2);     
-    cout<<endl;      // call your refactored print function
+    //printgraph(graph2);     
+    cout<<endl;      
     print_percentage_of_coredomains(graph1);
     cout<<endl;
-    print_percentage_of_coredomains(graph2); // call your domain stats function
+    system("pause");
+    print_percentage_of_coredomains(graph2); 
     cout<<endl;
+    system("pause");
     printGraphIntersection(graph1,graph2);
     
     return 0;

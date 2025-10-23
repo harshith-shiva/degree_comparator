@@ -668,38 +668,176 @@ int main() {
     unordered_map<string, vector<string>> graph2;
 
     string degreeName1 = "MSc Software Systems";
-    string degreeName2 = "be cse"; // or a different one later if you have another file
+    string degreeName2 = "anna university be cse";
 
     buildGraphFromCSV(graph1, degreeName1);
     buildGraphFromCSV(graph2, degreeName2);
 
-    drawGraph(graph1);
-    system("pause");
-    drawGraph(graph2);
+    sf::RenderWindow menuWindow(sf::VideoMode(1200, 800), "Course Graph Analyzer");
+    sf::Font font;
+    if (!font.loadFromFile("NotoSerif-Regular.ttf")) {
+        cerr << "Error: Could not load font!\n";
+        return 1;
+    }
 
-    visualizeCourseLevels(graph1);
-    system("pause");
+    sf::Text title("Course Prerequisite Analyzer", font, 30);
+    title.setFillColor(sf::Color::Black);
+    title.setPosition((1200.f - title.getLocalBounds().width) / 2.f, 20.f);
 
-    visualizeCourseLevels(graph2);
-    system("pause");
+    struct Button {
+        sf::RectangleShape shape;
+        sf::Text label;
+        std::function<void()> onClick;
+    };
 
-    print_percentage_of_coredomains(graph1);
-    system("pause");
+    vector<Button> buttons;
 
-    print_percentage_of_coredomains(graph2);
-    system("pause");
+    auto addButton = [&](float x, float y, const string& txt, auto&& func) {
+        Button b;
+        b.shape.setPosition(x, y);
+        b.shape.setSize({340.f, 50.f});
+        b.shape.setFillColor(sf::Color(100, 181, 246));
+        b.label.setFont(font);
+        b.label.setString(txt);
+        b.label.setCharacterSize(20);
+        b.label.setFillColor(sf::Color::White);
+        sf::FloatRect bounds = b.label.getLocalBounds();
+        b.label.setPosition(x + (340.f - bounds.width) / 2.f, y + (50.f - bounds.height) / 2.f - 5.f);
+        b.onClick = std::forward<decltype(func)>(func);
+        buttons.push_back(b);
+    };
 
-    printGraphIntersection(graph1, graph2);
-    system("pause");
+    auto displayText = [&](const string& windowTitle, const string& content) {
+        sf::RenderWindow textWindow(sf::VideoMode(800, 600), windowTitle);
+        if (!font.loadFromFile("NotoSerif-Regular.ttf")) {
+            cerr << "Error: Could not load font!\n";
+            return;
+        }
+        vector<sf::Text> lines;
+        stringstream ss(content);
+        string line;
+        float y_pos = 20.f;
+        while (getline(ss, line)) {
+            sf::Text text(line, font, 14);
+            text.setFillColor(sf::Color::Black);
+            text.setPosition(20.f, y_pos);
+            lines.push_back(text);
+            y_pos += 20.f;
+        }
+        while (textWindow.isOpen()) {
+            sf::Event event;
+            while (textWindow.pollEvent(event)) {
+                if (event.type == sf::Event::Closed)
+                    textWindow.close();
+            }
+            textWindow.clear(sf::Color::White);
+            for (auto& t : lines)
+                textWindow.draw(t);
+            textWindow.display();
+        }
+    };
 
-    longestChainTopo(graph1);
-    system("pause");
+    // Add buttons in a grid layout
+    addButton(50.f, 100.f, "Visualize MSc Graph", [&]{ drawGraph(graph1); });
+    addButton(420.f, 100.f, "Visualize BE CSE Graph", [&]{ drawGraph(graph2); });
+    addButton(790.f, 100.f, "Visualize MSc Levels", [&]{ visualizeCourseLevels(graph1); });
 
-    longestChainTopo(graph2);
-    system("pause");
+    addButton(50.f, 170.f, "Visualize BE CSE Levels", [&]{ visualizeCourseLevels(graph2); });
+    addButton(420.f, 170.f, "MSc Domain Percentages", [&]{
+        stringstream ss;
+        auto old = cout.rdbuf(ss.rdbuf());
+        print_percentage_of_coredomains(graph1);
+        cout.rdbuf(old);
+        displayText("MSc Domain Percentages", ss.str());
+    });
+    addButton(790.f, 170.f, "BE CSE Domain Percentages", [&]{
+        stringstream ss;
+        auto old = cout.rdbuf(ss.rdbuf());
+        print_percentage_of_coredomains(graph2);
+        cout.rdbuf(old);
+        displayText("BE CSE Domain Percentages", ss.str());
+    });
 
-    cout << "Jaccard Similarity: " << computeJaccardSimilarity(graph1, graph2) << "\n";
-    system("pause");
+    addButton(50.f, 240.f, "MSc Longest Chain", [&]{
+        stringstream ss;
+        auto old = cout.rdbuf(ss.rdbuf());
+        longestChainTopo(graph1);
+        cout.rdbuf(old);
+        displayText("MSc Longest Prerequisite Chain", ss.str());
+    });
+    addButton(420.f, 240.f, "BE CSE Longest Chain", [&]{
+        stringstream ss;
+        auto old = cout.rdbuf(ss.rdbuf());
+        longestChainTopo(graph2);
+        cout.rdbuf(old);
+        displayText("BE CSE Longest Prerequisite Chain", ss.str());
+    });
+    addButton(790.f, 240.f, "Common Courses", [&]{
+        stringstream ss;
+        auto old = cout.rdbuf(ss.rdbuf());
+        printGraphIntersection(graph1, graph2);
+        cout.rdbuf(old);
+        displayText("Common Courses", ss.str());
+    });
+
+    addButton(50.f, 310.f, "Jaccard Similarity", [&]{
+        double sim = computeJaccardSimilarity(graph1, graph2);
+        stringstream ss;
+        ss << "Jaccard Similarity: " << sim << "\n";
+        displayText("Jaccard Similarity", ss.str());
+    });
+    addButton(420.f, 310.f, "MSc Independent Courses", [&]{
+        stringstream ss;
+        auto old = cout.rdbuf(ss.rdbuf());
+        printIndependentCourses(graph1);
+        cout.rdbuf(old);
+        displayText("MSc Independent Courses", ss.str());
+    });
+    addButton(790.f, 310.f, "BE CSE Independent Courses", [&]{
+        stringstream ss;
+        auto old = cout.rdbuf(ss.rdbuf());
+        printIndependentCourses(graph2);
+        cout.rdbuf(old);
+        displayText("BE CSE Independent Courses", ss.str());
+    });
+
+    addButton(420.f, 380.f, "Exit", [&]{ menuWindow.close(); });
+
+    while (menuWindow.isOpen()) {
+        sf::Event event;
+        while (menuWindow.pollEvent(event)) {
+            if (event.type == sf::Event::Closed)
+                menuWindow.close();
+            if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
+                sf::Vector2f mouse = menuWindow.mapPixelToCoords({event.mouseButton.x, event.mouseButton.y});
+                for (auto& b : buttons) {
+                    if (b.shape.getGlobalBounds().contains(mouse)) {
+                        b.onClick();
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Hover effect
+        sf::Vector2i mousePixel = sf::Mouse::getPosition(menuWindow);
+        sf::Vector2f mouse = menuWindow.mapPixelToCoords(mousePixel);
+        for (auto& b : buttons) {
+            if (b.shape.getGlobalBounds().contains(mouse)) {
+                b.shape.setFillColor(sf::Color(66, 165, 245));
+            } else {
+                b.shape.setFillColor(sf::Color(100, 181, 246));
+            }
+        }
+
+        menuWindow.clear(sf::Color::White);
+        menuWindow.draw(title);
+        for (auto& b : buttons) {
+            menuWindow.draw(b.shape);
+            menuWindow.draw(b.label);
+        }
+        menuWindow.display();
+    }
 
     return 0;
 }
